@@ -100,8 +100,8 @@ jobs:
       - id: auth
         uses: google-github-actions/auth@v2.0.0
         with:
-          workload_identity_provider: 'projects/765255964105/locations/global/workloadIdentityPools/github-actions/providers/github'
-          service_account: 'github-actions@nasir-456515.iam.gserviceaccount.com'            
+          workload_identity_provider: 'projects/408455958307/locations/global/workloadIdentityPools/github-actions/providers/github'
+          service_account: 'github-actions@nasir-465814.iam.gserviceaccount.com'            
           # workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
           # service_account: '${{ secrets.SA_EMAIL }}' 
 
