@@ -1,0 +1,10 @@
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: react-movie-backendconfig
+  namespace: nasir
+spec:
+  healthCheck:
+    requestPath: /
+    port: 80
+    type: HTTP

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: react-movie-service
+  namespace: nasir
+  labels:
+    app: react-movie
+  annotations:
+    cloud.google.com/backend-config: '{"ports": {"80":"react-movie-backendconfig"}}'  
+spec:
+  selector:
+    app: react-movie 
+  ports:
+    - protocol: TCP
+      port: 80 
+      targetPort: 80
+  type: LoadBalancer
