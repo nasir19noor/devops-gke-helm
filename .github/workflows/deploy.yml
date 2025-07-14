@@ -1,0 +1,68 @@
+name: Deploy to GKE
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker Image Tag (e.g., latest, or a specific version)'
+        required: false
+        default: 'latest' 
+
+permissions:
+  contents: read
+  id-token: write           
+
+env:
+  PROJECT_ID: nasir-456515 
+  AR_REPO: nasir           
+  AR_LOCATION: asia-southeast1 
+  IMAGE_NAME: react-movie    
+  GKE_CLUSTER: nasir-cluster
+  GKE_ZONE: asia-southeast1-c 
+  GKE_NAMESPACE: nasir  
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Authenticate to Google Cloud
+      id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: 'projects/765255964105/locations/global/workloadIdentityPools/github-actions/providers/github'
+        service_account: 'github-actions@nasir-456515.iam.gserviceaccount.com'
+
+    - name: Get GKE Credentials
+      run: |
+        gcloud components install gke-gcloud-auth-plugin
+        gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} --zone ${{ env.GKE_ZONE }}
+
+    - name: Deploy to GKE
+      run: |
+        IMAGE_FULL_PATH="${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}"
+        echo "Deploying image: $IMAGE_FULL_PATH"
+        
+        kubectl get namespace ${{ env.GKE_NAMESPACE }} || kubectl create namespace ${{ env.GKE_NAMESPACE }}
+        
+        sed -i "s|asia-southeast1-docker.pkg.dev/nasir-456515/nasir/react-movie:latest|$IMAGE_FULL_PATH|" gcp/k8s/deployment.yaml
+        
+        kubectl apply -f gcp/k8s/deployment.yaml --namespace ${{ env.GKE_NAMESPACE }}
+        #kubectl delete -f gcp/k8s/backend.yaml --namespace ${{ env.GKE_NAMESPACE }}
+        kubectl apply -f gcp/k8s/service.yaml --namespace ${{ env.GKE_NAMESPACE }}
+        #kubectl delete -f gcp/k8s/ingress.yaml --namespace ${{ env.GKE_NAMESPACE }}
+        kubectl apply -f gcp/k8s/managedcert.yaml --namespace ${{ env.GKE_NAMESPACE }} 
+        #kubectl delete -f gcp/k8s/http-to-https.yaml --namespace ${{ env.GKE_NAMESPACE }}                  
+
+    - name: Verify Deployment
+      run: |
+        echo "Deployment to GKE submitted. Waiting for rollout..."
+        kubectl rollout status deployment/react-movie-deployment -n ${{ env.GKE_NAMESPACE }}
+        echo "Verifying service external IP..."
+        kubectl get service react-movie-service -n ${{ env.GKE_NAMESPACE }}

@@ -1,0 +1,139 @@
+# name: 'Terraform Plan'
+
+# on:
+#   push:
+#     # branches: 
+#       # - '**'
+#       # - '!main'
+#     branches: ['main']
+
+#     paths:
+#       - 'gcp/services/**.tf' 
+#       - 'gcp/services/**.tfvars'  
+#       - '.github/workflows/gcp-plan.yml'
+#   workflow_call:    
+
+# env:
+#   PROJECT_ID: ${{ vars.PROJECT_ID }}
+#   SECRET_ID: ${{ vars.SECRET_ID }}
+#   BUCKET: ${{ vars.TF_BUCKET }}
+#   SECRET_GH_TOKEN: 	${{ vars.SECRET_GH_TOKEN }}
+#   GCP_CICD_DEFAULT_SA: ${{ vars.GCP_CICD_DEFAULT_SA }}
+#   ARTIFACT_REPO: ${{ vars.ARTIFACT_REPO }}
+#   GAR_REGION: ${{ vars.GAR_REGION }}
+#   ARTIFACT_BUCKET : ${{ vars.ARTIFACT_BUCKET }}
+#   PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+#   PR_NUMBER: ${{ github.event.number }}
+#   RUN_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+#   GITHUB_ACTOR: ${{ github.actor }}
+#   GITHUB_EVENT_NAME: ${{ github.event_name }}
+#   GITHUB_WORKFLOW: ${{ github.workflow }} 
+
+# jobs:
+#   check:
+#     name: fetch modified terraform directory
+#     outputs:
+#       changed_folders: ${{ steps.check_directory.outputs.folders }}
+#       run_tf: ${{ steps.check_directory.outputs.run_tf }}
+#     runs-on: ubuntu-latest
+
+#     steps:
+
+#       - name: Checkout Repository
+#         uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0
+
+#       - name: Get terraform plan apply folder path
+#         id: check_directory
+#         shell: bash
+#         run: |
+#           MODIFIED_DIR_NAME=$(dirname $(git diff --name-only HEAD^) | egrep 'gcp/services' | sort | uniq | xargs -I {} find {} -name '*.tf' -print 2>/dev/null | xargs -I {} dirname {} | sort | uniq | paste -s -d ' ' -) || true
+#           echo "$MODIFIED_DIR_NAME"
+#           if [[ ${MODIFIED_DIR_NAME} ]]
+#           then  
+#             echo "folders=${MODIFIED_DIR_NAME}" >> ${GITHUB_OUTPUT}
+#             echo "terraform plan and apply will run on ${MODIFIED_DIR_NAME}"
+#             echo "run_tf=true" >> ${GITHUB_OUTPUT}
+#           else
+#             echo "run_tf=false" >> ${GITHUB_OUTPUT}
+#             echo "The execution of 'gcp_dev_terraform_plan_apply' job will be skipped as there are no folders containing terraform files."
+#           fi
+
+#   terraform:
+#     needs: check
+#     if: needs.check.outputs.run_tf == 'true'
+#     name: "terraform plan and IAC scan"
+#     runs-on: ubuntu-latest
+#     permissions:
+#       pull-requests: 'write'
+#       contents: read
+#       id-token: write
+#       issues: write
+#     env:
+#       CHANGED_FOLDERS: ${{ needs.check.outputs.changed_folders }}
+
+#     steps:
+#       - name: Checkout Repository
+#         uses: actions/checkout@v4
+
+#       - name: Setup gcloud
+#         uses: google-github-actions/setup-gcloud@v2
+#         with:
+#           version: '>= 363.0.0'
+
+#       - name: Authenticate to Google Cloud
+#         uses: google-github-actions/auth@v2
+#         with:
+#           token_format: access_token
+#           workload_identity_provider: ${{ vars.WIP }}
+#           service_account: ${{ vars.SA }}
+#           create_credentials_file: true
+
+#       # - name: configure Regula
+#       #   run: |
+#       #     wget -q https://github.com/fugue/regula/releases/download/v3.2.1/regula_3.2.1_Linux_x86_64.tar.gz
+#       #     tar -xf regula_3.2.1_Linux_x86_64.tar.gz
+#       #     mv regula /usr/local/bin
+
+#       # - name: Compliance check
+#       #   run: |
+#       #     date -u +%Y%m%d-T%H%M%S > TAG
+#       #     regula run 0-bootstrap 1-org 2-env 3-networks 4-projects 5-app-infra --exclude FG_R00409,FG_R00406,FG_R00405,FG_R00404,FG_R00385,FG_R00438,FG_R00433,FG_R00436,FG_R00429,FG_R00427,FG_R00426,FG_R00425,FG_R00424,FG_R00420,FG_R00421 -f json | tee ./compliance-bootstrap-$(cat TAG).json
+
+#       # - name: Upload compliance report
+#       #   id: compliance-check
+#       #   continue-on-error: true
+#       #   run: |
+#       #     jq .summary.rule_results.FAIL ./compliance-bootstrap-$(cat TAG).json > STATUS
+#       #     if [ $(cat STATUS) == 0 ]; then
+#       #           echo "-----------------------------------------------------------"
+#       #           echo "The Terraform code is compliant with Compliance standards"
+#       #           echo "-----------------------------------------------------------"
+#       #           gcloud storage cp ./compliance-bootstrap-$(cat TAG).json gs://${{ env.BUCKET }}/tf-validator/compliance-bootstrap-$(cat TAG).json --quiet
+#       #     else
+#       #           echo "-----------------------------------------------------------"
+#       #           echo "Please check terraform code fix the errors listed above."
+#       #           echo "-----------------------------------------------------------"
+#       #           gcloud storage cp ./compliance-bootstrap-$(cat TAG).json gs://${{ env.BUCKET }}/tf-validator/compliance-bootstrap-$(cat TAG).json --quiet
+#       #           exit 1
+#       #     fi
+
+#       # - name: Trigger build plan
+#       #   if: steps.compliance-check.outcome == 'success'
+#       #   id: cloudbuild_tf_plan
+#       #   run: |
+#       #     cd ${{ github.workspace}}/build
+#       #     gcloud --quiet beta builds submit --config=github-ssh-cloudbuild-plan.yaml --region=${{ env.GAR_REGION }} --gcs-source-staging-dir=gs://${{ env.GCP_LZ_CICD_ARTIFACT_BUCKET }}/source \
+#       #       --project=${{ env.PROJECT_ID }} \
+#       #       --substitutions=_SECRET_ID=${{ env.SECRET_ID }},_GCP_CICD_DEFAULT_SA=${{ env.GCP_CICD_DEFAULT_SA }},_GIT_HEAD_BRANCH=${{ github.event.pull_request.head.ref }},_GIT_WORK_DIR="/workspace/${GITHUB_REPOSITORY##*/}",_GIT_LZ_REPO="${{ github.repository }}.git",_GAR_REGION=${{ env.GAR_REGION}},_PR_NUMBER=${{ env.PR_NUMBER }},_GAR_REPO=${{ env.ARTIFACT_REPO}},_SECRET_GH_TOKEN=${{ env.SECRET_GH_TOKEN }},_CHANGED_FOLDERS=$(echo ${{ env.CHANGED_FOLDERS }} | tr ' ' '#')
+#       #     if [ $? == 0 ]; then
+#       #           echo "-----------------------------------------------------------"
+#       #           echo "Terraform plan successfully completed."
+#       #           echo "-----------------------------------------------------------"
+#       #     else
+#       #           echo "--------------------------------------------------------------------------------"
+#       #           echo "Terraform plan failed. Please check terraform code fix the errors listed above."
+#       #           echo "--------------------------------------------------------------------------------"
+#       #           exit 1
+#       #     fi

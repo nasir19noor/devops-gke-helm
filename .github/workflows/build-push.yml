@@ -1,0 +1,58 @@
+name: Build and Push Docker Image to Artifact Registry
+
+on:
+  push:
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-push.yml'
+    branches:
+      - main    
+  pull_request:
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-push.yml'   
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write      
+env:
+  PROJECT_ID: nasir-456515 
+  AR_REPO: nasir           
+  AR_LOCATION: asia-southeast1 
+  IMAGE_NAME: react-movie     
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - id: auth
+      uses: google-github-actions/auth@v2.0.0
+      with:
+        workload_identity_provider: 'projects/765255964105/locations/global/workloadIdentityPools/github-actions/providers/github'
+        service_account: 'github-actions@nasir-456515.iam.gserviceaccount.com'       
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for Artifact Registry
+      run: gcloud auth configure-docker ${{ env.AR_LOCATION }}-docker.pkg.dev
+
+    - name: Build and Push Docker Image
+      run: |
+        cd app
+        GIT_TAG=$(git rev-parse --short HEAD)
+        docker build --no-cache --build-arg VITE_TMDB_API_KEY=${{ secrets.VITE_TMDB_API_KEY }} -t ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:latest -t ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:${GIT_TAG} .
+        docker push ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:latest
+        docker push ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:${GIT_TAG}
+
+    - name: Verify Image Push
+      run: |
+        echo "Image pushed successfully to ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:latest"
+
+
