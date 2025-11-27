@@ -100,7 +100,7 @@ jobs:
       - id: auth
         uses: google-github-actions/auth@v2.0.0
         with:
-          workload_identity_provider: 'projects/349067998773/locations/global/workloadIdentityPools/github-actions/providers/github'
+          workload_identity_provider: 'projects/349067998773/locations/global/workloadIdentityPools/github/providers/github'
           service_account: 'github-actions@glassy-hue-476412-t3.iam.gserviceaccount.com'            
           # workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
           # service_account: '${{ secrets.SA_EMAIL }}' 
