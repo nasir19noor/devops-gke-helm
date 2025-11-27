@@ -1,139 +1,147 @@
-# name: 'Terraform Plan'
+name: 'Terraform Plan'
 
-# on:
-#   push:
-#     # branches: 
-#       # - '**'
-#       # - '!main'
-#     branches: ['main']
+on:
+  push:
+    branches-ignore: ['main']
+    paths:
+      - 'gcp/services/**.tf' 
+      - 'gcp/services/**.tfvars'  
+      - '.github/workflows/gcp-plan.yml'
+permissions:
+  contents: read
+  id-token: write
 
-#     paths:
-#       - 'gcp/services/**.tf' 
-#       - 'gcp/services/**.tfvars'  
-#       - '.github/workflows/gcp-plan.yml'
-#   workflow_call:    
+env:
+  TF_VERSION: '1.11.4'  
+  GCP_REGION: 'asia-southeast1'  
 
-# env:
-#   PROJECT_ID: ${{ vars.PROJECT_ID }}
-#   SECRET_ID: ${{ vars.SECRET_ID }}
-#   BUCKET: ${{ vars.TF_BUCKET }}
-#   SECRET_GH_TOKEN: 	${{ vars.SECRET_GH_TOKEN }}
-#   GCP_CICD_DEFAULT_SA: ${{ vars.GCP_CICD_DEFAULT_SA }}
-#   ARTIFACT_REPO: ${{ vars.ARTIFACT_REPO }}
-#   GAR_REGION: ${{ vars.GAR_REGION }}
-#   ARTIFACT_BUCKET : ${{ vars.ARTIFACT_BUCKET }}
-#   PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-#   PR_NUMBER: ${{ github.event.number }}
-#   RUN_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-#   GITHUB_ACTOR: ${{ github.actor }}
-#   GITHUB_EVENT_NAME: ${{ github.event_name }}
-#   GITHUB_WORKFLOW: ${{ github.workflow }} 
+jobs:
+  detect-changed-dirs:
+    name: Detect Changed Directories
+    runs-on: ubuntu-latest
+    outputs:
+      dirs: ${{ steps.find-dirs.outputs.dirs }}
+      
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  
 
-# jobs:
-#   check:
-#     name: fetch modified terraform directory
-#     outputs:
-#       changed_folders: ${{ steps.check_directory.outputs.folders }}
-#       run_tf: ${{ steps.check_directory.outputs.run_tf }}
-#     runs-on: ubuntu-latest
+      - name: Find Changed Terraform Directories
+        id: find-dirs
+        run: |
+          # Handle different event types
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "Processing Pull Request event"
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.sha }}"
+            
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              echo "Base SHA is empty or zero. Using all terraform files."
+              CHANGED_FILES=$(find gcp/services -type f -name "*.tf" -o -name "*.tfvars" | sort)
+            else
+              echo "Comparing $BASE_SHA with $HEAD_SHA"
+              CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -E '^gcp/services/.*\.(tf|tfvars)$' || echo "")
+            fi
+            
+          elif [ "${{ github.event_name }}" == "push" ]; then
+            echo "Processing Push event"
+            BEFORE_SHA="${{ github.event.before }}"
+            AFTER_SHA="${{ github.event.after }}"
+            
+            if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              echo "Before SHA is empty or zero. Getting all committed files."
+              CHANGED_FILES=$(git ls-tree --name-only -r HEAD | grep -E '^gcp/services/.*\.(tf|tfvars)$' || echo "")
+            else
+              echo "Comparing $BEFORE_SHA with $AFTER_SHA"
+              CHANGED_FILES=$(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA" | grep -E '^gcp/services/.*\.(tf|tfvars)$' || echo "")
+            fi
+          else
+            echo "Processing other event type"
+            CHANGED_FILES=$(find gcp/services -type f -name "*.tf" -o -name "*.tfvars" | sort)
+          fi
+          
+          # Process the changed files to get directories
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "Found changed files:"
+            echo "$CHANGED_FILES"
+            DIRS=$(echo "$CHANGED_FILES" | xargs -I{} dirname {} 2>/dev/null | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))' || echo "[]")
+          else
+            echo "No changed terraform files detected"
+            DIRS="[]"
+          fi
+          
+          echo "dirs=$DIRS" >> $GITHUB_OUTPUT
+          echo "Changed directories: $DIRS"
+  
 
-#     steps:
+  terraform-apply:
+    name: Terraform Apply
+    needs: [detect-changed-dirs]
+    if: ${{ needs.detect-changed-dirs.outputs.dirs != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        directory: ${{ fromJSON(needs.detect-changed-dirs.outputs.dirs) }}
+      fail-fast: false
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3     
 
-#       - name: Checkout Repository
-#         uses: actions/checkout@v4
-#         with:
-#           fetch-depth: 0
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}   
 
-#       - name: Get terraform plan apply folder path
-#         id: check_directory
-#         shell: bash
-#         run: |
-#           MODIFIED_DIR_NAME=$(dirname $(git diff --name-only HEAD^) | egrep 'gcp/services' | sort | uniq | xargs -I {} find {} -name '*.tf' -print 2>/dev/null | xargs -I {} dirname {} | sort | uniq | paste -s -d ' ' -) || true
-#           echo "$MODIFIED_DIR_NAME"
-#           if [[ ${MODIFIED_DIR_NAME} ]]
-#           then  
-#             echo "folders=${MODIFIED_DIR_NAME}" >> ${GITHUB_OUTPUT}
-#             echo "terraform plan and apply will run on ${MODIFIED_DIR_NAME}"
-#             echo "run_tf=true" >> ${GITHUB_OUTPUT}
-#           else
-#             echo "run_tf=false" >> ${GITHUB_OUTPUT}
-#             echo "The execution of 'gcp_dev_terraform_plan_apply' job will be skipped as there are no folders containing terraform files."
-#           fi
+      - id: auth
+        uses: google-github-actions/auth@v2.0.0
+        with:
+          workload_identity_provider: 'projects/349067998773/locations/global/workloadIdentityPools/github/providers/github'
+          service_account: 'github-actions@glassy-hue-476412-t3.iam.gserviceaccount.com'            
+          # workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
+          # service_account: '${{ secrets.SA_EMAIL }}' 
 
-#   terraform:
-#     needs: check
-#     if: needs.check.outputs.run_tf == 'true'
-#     name: "terraform plan and IAC scan"
-#     runs-on: ubuntu-latest
-#     permissions:
-#       pull-requests: 'write'
-#       contents: read
-#       id-token: write
-#       issues: write
-#     env:
-#       CHANGED_FOLDERS: ${{ needs.check.outputs.changed_folders }}
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+          
+      - name: Configure gsutil
+        run: |
+          gcloud config set pass_credentials_to_gsutil true
+          gcloud auth configure-docker --quiet       
 
-#     steps:
-#       - name: Checkout Repository
-#         uses: actions/checkout@v4
+      - name: Verify Authentication
+        run: |
+          echo "Authenticated as: $(gcloud auth list --filter=status:ACTIVE --format='value(account)')"
+          echo "Project: $(gcloud config get-value project)"          
 
-#       - name: Setup gcloud
-#         uses: google-github-actions/setup-gcloud@v2
-#         with:
-#           version: '>= 363.0.0'
+      - name: Configure backend.conf
+        run: |
+          cd gcp
+          state_bucket=$(yq e '.global.state_bucket' config.yaml)
+          sed -i "s/^bucket = .*/bucket = \"${state_bucket}\"/" backend.conf
+          sleep 100
+          cat backend.conf   
+          
+      - name: Verify GCS Access
+        run: |
+          cd gcp
+          state_bucket=$(yq e '.global.state_bucket' config.yaml)
+          gsutil ls gs://${state_bucket}/ || echo "Bucket access verification failed"          
+      - name: Terraform Init
+        working-directory: ${{ matrix.directory }}       
+        run: |
+          cp ../../backend.conf .
+          terraform init -backend-config=backend.conf
 
-#       - name: Authenticate to Google Cloud
-#         uses: google-github-actions/auth@v2
-#         with:
-#           token_format: access_token
-#           workload_identity_provider: ${{ vars.WIP }}
-#           service_account: ${{ vars.SA }}
-#           create_credentials_file: true
+      - name: Terraform Validate
+        working-directory: ${{ matrix.directory }}
+        run: terraform validate
 
-#       # - name: configure Regula
-#       #   run: |
-#       #     wget -q https://github.com/fugue/regula/releases/download/v3.2.1/regula_3.2.1_Linux_x86_64.tar.gz
-#       #     tar -xf regula_3.2.1_Linux_x86_64.tar.gz
-#       #     mv regula /usr/local/bin
-
-#       # - name: Compliance check
-#       #   run: |
-#       #     date -u +%Y%m%d-T%H%M%S > TAG
-#       #     regula run 0-bootstrap 1-org 2-env 3-networks 4-projects 5-app-infra --exclude FG_R00409,FG_R00406,FG_R00405,FG_R00404,FG_R00385,FG_R00438,FG_R00433,FG_R00436,FG_R00429,FG_R00427,FG_R00426,FG_R00425,FG_R00424,FG_R00420,FG_R00421 -f json | tee ./compliance-bootstrap-$(cat TAG).json
-
-#       # - name: Upload compliance report
-#       #   id: compliance-check
-#       #   continue-on-error: true
-#       #   run: |
-#       #     jq .summary.rule_results.FAIL ./compliance-bootstrap-$(cat TAG).json > STATUS
-#       #     if [ $(cat STATUS) == 0 ]; then
-#       #           echo "-----------------------------------------------------------"
-#       #           echo "The Terraform code is compliant with Compliance standards"
-#       #           echo "-----------------------------------------------------------"
-#       #           gcloud storage cp ./compliance-bootstrap-$(cat TAG).json gs://${{ env.BUCKET }}/tf-validator/compliance-bootstrap-$(cat TAG).json --quiet
-#       #     else
-#       #           echo "-----------------------------------------------------------"
-#       #           echo "Please check terraform code fix the errors listed above."
-#       #           echo "-----------------------------------------------------------"
-#       #           gcloud storage cp ./compliance-bootstrap-$(cat TAG).json gs://${{ env.BUCKET }}/tf-validator/compliance-bootstrap-$(cat TAG).json --quiet
-#       #           exit 1
-#       #     fi
-
-#       # - name: Trigger build plan
-#       #   if: steps.compliance-check.outcome == 'success'
-#       #   id: cloudbuild_tf_plan
-#       #   run: |
-#       #     cd ${{ github.workspace}}/build
-#       #     gcloud --quiet beta builds submit --config=github-ssh-cloudbuild-plan.yaml --region=${{ env.GAR_REGION }} --gcs-source-staging-dir=gs://${{ env.GCP_LZ_CICD_ARTIFACT_BUCKET }}/source \
-#       #       --project=${{ env.PROJECT_ID }} \
-#       #       --substitutions=_SECRET_ID=${{ env.SECRET_ID }},_GCP_CICD_DEFAULT_SA=${{ env.GCP_CICD_DEFAULT_SA }},_GIT_HEAD_BRANCH=${{ github.event.pull_request.head.ref }},_GIT_WORK_DIR="/workspace/${GITHUB_REPOSITORY##*/}",_GIT_LZ_REPO="${{ github.repository }}.git",_GAR_REGION=${{ env.GAR_REGION}},_PR_NUMBER=${{ env.PR_NUMBER }},_GAR_REPO=${{ env.ARTIFACT_REPO}},_SECRET_GH_TOKEN=${{ env.SECRET_GH_TOKEN }},_CHANGED_FOLDERS=$(echo ${{ env.CHANGED_FOLDERS }} | tr ' ' '#')
-#       #     if [ $? == 0 ]; then
-#       #           echo "-----------------------------------------------------------"
-#       #           echo "Terraform plan successfully completed."
-#       #           echo "-----------------------------------------------------------"
-#       #     else
-#       #           echo "--------------------------------------------------------------------------------"
-#       #           echo "Terraform plan failed. Please check terraform code fix the errors listed above."
-#       #           echo "--------------------------------------------------------------------------------"
-#       #           exit 1
-#       #     fi
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ matrix.directory }}
+        run: terraform plan
+        continue-on-error: true   
+        
