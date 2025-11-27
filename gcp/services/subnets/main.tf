@@ -29,5 +29,3 @@ module "vpc_subnets" {
 }
 
 
-
-
