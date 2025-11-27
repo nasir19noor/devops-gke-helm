@@ -6,6 +6,3 @@ module "vpc" {
   description               = local.description
 }
 
-
-
-
