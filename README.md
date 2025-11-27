@@ -11,7 +11,7 @@ Set Project ID
 ```
 export PROJECT_ID="<your-gcp-project>"
 export PROJECT_NUMBER="<project number>"
-REPO="<Your Repository>"
+export REPO="<Your Repository>"
 export SA_NAME="github-actions"
 export SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 ```
