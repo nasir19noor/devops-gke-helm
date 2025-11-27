@@ -10,6 +10,8 @@ gcloud services enable iam.googleapis.com
 Set Project ID
 ```
 export PROJECT_ID="<your-gcp-project>"
+export PROJECT_NUMBER="<project number>"
+REPO="<Your Repository>"
 export SA_NAME="github-actions"
 export SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 ```
@@ -82,21 +84,18 @@ https://docs.github.com/en/actions/how-tos/security-for-github-actions/security-
 
 ### Step 6: Configure Service Account IAM Policy
 Get the full provider name
-```
-export WORKLOAD_IDENTITY_PROVIDER="projects/${PROJECT_ID}/locations/global/workloadIdentityPools/${POOL_ID}/providers/${PROVIDER_ID}"
-```
 Allow the GitHub Actions to impersonate the service account
 ```
 gcloud iam service-accounts add-iam-policy-binding ${SA_EMAIL} \
     --project=${PROJECT_ID} \
     --role="roles/iam.workloadIdentityUser" \
-    --member="principalSet://iam.googleapis.com/${WORKLOAD_IDENTITY_PROVIDER}/attribute.repository/${GITHUB_REPO}"
+    --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/attribute.repository/${REPO}"
 ```
 ```
-gcloud iam service-accounts add-iam-policy-binding "github-actions@nasir-456515.iam.gserviceaccount.com" \
-    --project="nasir-456515" \
+gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+    --project="${PROJECT_ID}" \
     --role="roles/iam.workloadIdentityUser" \
-    --member="principalSet://iam.googleapis.com/projects/765255964105/locations/global/workloadIdentityPools/github-actions/attribute.repository/nasir19noor/devops-gke-react-movie-list"
+    --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/attribute.repository/${REPO}"
 ```
 
 ### Step 7: Create Helm Chart Structure
