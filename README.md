@@ -80,6 +80,10 @@ gcloud iam workload-identity-pools create ${POOL_ID} \
 
 https://docs.github.com/en/actions/how-tos/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform
 
+![Alt text](images/WIP-2.png "")
+
+![Alt text](images/WIP-3.png "")
+
 
 
 ### Step 6: Configure Service Account IAM Policy
