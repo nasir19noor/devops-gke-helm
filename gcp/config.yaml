@@ -7,9 +7,9 @@ network:
   vpc_name: "gke-nasir-vpc" 
   auto_create_subnetworks: false
   description: "GKE Nasir VPC"
-  subnet_name: "gke-nasir-asia-southeast1"
+  subnet_name: "gke-nasir-asia-southeast1 Singapore"
   subnet_ip: "10.0.0.0/16"
-  subnet_description: "GKE Nasir asia southeast 1"
+  subnet_description: "GKE Nasir asia southeast 1 Singapore"
 
 management:
   instance_name: "management-vm"

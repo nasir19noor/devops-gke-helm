@@ -76,8 +76,8 @@ jobs:
           echo "Changed directories: $DIRS"
   
 
-  terraform-apply:
-    name: Terraform Apply
+  terraform-plan:
+    name: Terraform Plan
     needs: [detect-changed-dirs]
     if: ${{ needs.detect-changed-dirs.outputs.dirs != '[]' }}
     runs-on: ubuntu-latest
