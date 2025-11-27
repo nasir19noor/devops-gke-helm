@@ -1,7 +1,7 @@
 global:
   region: "asia-southeast1"
-  state_bucket: "gke-nasir-tf-state-3"
-  project_id: "nasir-465814"
+  state_bucket: "gke-nasir-tf-state-4"
+  project_id: "glassy-hue-476412-t3"
 
 network:
   vpc_name: "gke-nasir-vpc" 
