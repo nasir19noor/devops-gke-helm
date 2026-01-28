@@ -1,21 +1,21 @@
 global:
-  region: "asia-southeast1"
-  state_bucket: "gke-nasir-tf-state-4"
-  project_id: "glassy-hue-476412-t3"
+  region: "asia-southeast2"
+  state_bucket: "nasir-terraform-state-100"
+  project_id: "nasir-485611"
 
 network:
-  vpc_name: "gke-nasir-vpc" 
+  vpc_name: "nasir-vpc" 
   auto_create_subnetworks: false
-  description: "GKE Nasir VPC"
-  subnet_name: "gke-nasir-asia-southeast1"
+  description: "Nasir VPC"
+  subnet_name: "nasir-asia-southeast2"
   subnet_ip: "10.0.0.0/16"
-  subnet_description: "GKE Nasir asia southeast 1 Singapore"
+  subnet_description: "Nasir asia southeast 2 Jakarta"
 
 management:
   instance_name: "management-vm"
-  zone: "asia-southeast1-c"
+  zone: "asia-southeast2-c"
   instance: "linux"
-  instance_type: "n1-standard-1"
+  instance_type: "n2-standard-2"
   disk_size_gb: 50
   disk_type: "pd-balanced"
   image: "ubuntu-os-cloud/ubuntu-2204-lts"
@@ -24,7 +24,7 @@ management:
   allow_stopping_for_update: true  
 
 firewall-ssh:
-  name: "gke-nasir-vpc-allow-ssh"
+  name: "nasir-vpc-allow-ssh"
   description: "allow ssh"
   protocol: "tcp"
   ports: ["22"]
@@ -33,8 +33,8 @@ firewall-ssh:
 
 gke:
   name: "nasir-cluster"
-  description: "GKE Nasir Cluster"
-  kubernetes_version: "1.32.2-gke.1297002"
+  description: "Nasir Cluster"
+  kubernetes_version: "1.33.5-gke.2100000"
   datapath_provider: "LEGACY_DATAPATH"  
   enable_l4_ilb_subsetting: true
   networking_mode: "VPC_NATIVE"
@@ -42,20 +42,20 @@ gke:
   ip_range_services: "sub-gke-svc"
   master_ipv4_cidr_block: "10.21.14.0/28"
   regional: false
-  zones: ["asia-southeast1-c"]
+  zones: ["asia-southeast2-b"]
   deletion_protection: false
   enable_private_nodes: true
   enable_private_endpoint: false
   service_account: "google_service_account.gke_sa.email"
   remove_default_node_pool: true
   node_pool_name: "nasir-node-pool"
-  machine_type: "n1-standard-2"
+  machine_type: "n2-standard-2"
   image_type: "COS_CONTAINERD"
   local_ssd_count: 0
   disk_size_gb: 50
   disk_type: "pd-balanced"
   preemptible: false
-  node_locations: "asia-southeast1-c"
+  node_locations: "asia-southeast2-b"
   autoscaling: true
   min_count: 1
   max_count: 2

@@ -102,6 +102,13 @@ gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
     --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/attribute.repository/${REPO}"
 ```
 
+```
+google.subject = assertion.sub
+attribute.actor = assertion.actor
+attribute.repository = assertion.repository
+assertion.repository=='nasir19noor/devops-gke-helm'
+```
+
 ### Step 7: Create Helm Chart Structure
 ```
 cd gcp

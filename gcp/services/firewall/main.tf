@@ -34,6 +34,6 @@ module "firewall-allow-30080" {
   protocol      = local.ssh_protocol
   ports         = ["30000-33000"]
   source_ranges = local.ssh_source_ranges
-  target_tags   = ["gke-nasir-cluster-0c073d54-node"]
+  target_tags   = ["gke-nasir-cluster-3db4e638-node"]
 }
 

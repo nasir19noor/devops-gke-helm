@@ -2,6 +2,7 @@
 echo "----------------------------------"
 echo "Create Terraform State Bucket"
 echo "----------------------------------"
+cd bootstrap
 cd terraform-state-bucket
 terraform init
 terraform plan

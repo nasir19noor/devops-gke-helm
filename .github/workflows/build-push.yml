@@ -18,10 +18,10 @@ permissions:
   contents: read
   id-token: write      
 env:
-  PROJECT_ID: nasir-456515 
+  PROJECT_ID: nasir-nasir-485611
   AR_REPO: nasir           
-  AR_LOCATION: asia-southeast1 
-  IMAGE_NAME: react-movie     
+  AR_LOCATION: asia-southeast2
+  IMAGE_NAME: test    
 
 jobs:
   build-and-push:
@@ -34,8 +34,8 @@ jobs:
     - id: auth
       uses: google-github-actions/auth@v2.0.0
       with:
-        workload_identity_provider: 'projects/765255964105/locations/global/workloadIdentityPools/github-actions/providers/github'
-        service_account: 'github-actions@nasir-456515.iam.gserviceaccount.com'       
+          workload_identity_provider: 'projects/456032467318/locations/global/workloadIdentityPools/github/providers/github'
+          service_account: 'github-actions@nasir-485611.iam.gserviceaccount.com'    
 
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
